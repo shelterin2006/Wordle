@@ -1,4 +1,5 @@
 import time
+from operator import truediv
 
 import pygame
 import random
@@ -117,7 +118,7 @@ class Tile:
     def update(self):
         if self.is_flipping:
             # Tăng góc lật, tốc độ có thể điều chỉnh
-            self.flip_angle += 8
+            self.flip_angle += 1
             # Giai đoạn 1 kết thúc (lật được nửa đường)
             if self.flip_angle >= 90 and self.color != self.target_color:
                 self.color = self.target_color
@@ -169,13 +170,31 @@ class Tile:
         # Cuối cùng, "dán" kết quả (bản gốc hoặc bản đã co giãn) lên màn hình chính
         surface.blit(drawable_surface, drawable_rect)
 
+rowFip = 0
+colFlip = 10
+FlipAnimation = False
+def flip(feedbacks, current_guess, current_row, matrix):
+    global rowFip
+    global colFlip
+    global FlipAnimation
+    matrix[rowFip][colFlip].update()
+    if not matrix[rowFip][colFlip].is_flipping:
+        colFlip += 1
+        if colFlip != WORD_LENGTH:
+            matrix[rowFip][colFlip].start_flip(feedbacks[rowFip][colFlip])
+
 def draw_grid(feedbacks, current_guess, current_row, matrix):
+    global FlipAnimation
+    if colFlip == WORD_LENGTH:
+        FlipAnimation = False
     for i in range(MAX_GUESSES):
         for j in range(WORD_LENGTH):
+            if i == rowFip and j == colFlip:
+                flip(feedbacks, current_guess, i, matrix)
             color = LIGHT_GRAY
-            if(feedbacks[i][j]):
+            if feedbacks[i][j]:
                 color = feedbacks[i][j]
-            matrix[i][j].draw(screen, color);
+            matrix[i][j].draw(screen, color)
 
 def draw_message(message):
     """Hiển thị thông báo ở cuối màn hình."""
@@ -191,6 +210,9 @@ def main():
     current_guess = []
     current_row = 0
     current_column = 0
+    global rowFip
+    global colFlip
+    global FlipAnimation
     game_over = False
     message = ""
 
@@ -211,15 +233,18 @@ def main():
                 running = False
                 pygame.quit()
                 sys.exit()
-
-            if not game_over and event.type == pygame.KEYDOWN:
+            if not game_over and event.type == pygame.KEYDOWN and not FlipAnimation:
                 if event.key == pygame.K_RETURN:  # Phím Enter
+                    FlipAnimation = True
+                    rowFip = current_row
+                    colFlip = 0
                     if current_column == WORD_LENGTH:
                         guess_str = ""
                         for i in range(WORD_LENGTH):
                             guess_str += matrix[current_row][i].get_letter().lower()
                         print(guess_str, secret_word)
                         feedbacks[current_row] = get_feedback(guess_str, secret_word)
+                        matrix[rowFip][colFlip].start_flip(feedbacks[rowFip][colFlip])
 
                         if guess_str == secret_word:
                             message = f"Chính xác! Từ đó là: {secret_word.upper()}"
