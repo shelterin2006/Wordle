@@ -33,6 +33,7 @@ MAX_GUESSES = 6
 
 # Cấu hình lưới
 SQUARE_SIZE = 80
+CORNER_RADIUS = 8
 SQUARE_MARGIN = 10
 GRID_TOP_MARGIN = 100
 GRID_LEFT_MARGIN = (SCREEN_WIDTH - (WORD_LENGTH * SQUARE_SIZE + (WORD_LENGTH - 1) * SQUARE_MARGIN)) // 2
@@ -133,18 +134,22 @@ class Tile:
 
     def draw(self, surface, color):
         # --- Bước 1: Chuẩn bị một "canvas phụ" cho ô vuông ---
-        # Luôn tạo một surface tạm để vẽ mọi thứ lên đó trước.
-        # SRCALPHA cho phép nó có nền trong suốt nếu cần.
         temp_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
 
         # --- Bước 2: Vẽ tất cả các thành phần lên canvas phụ đó ---
-        # Code vẽ nền, viền và chữ bây giờ chỉ còn ở một nơi duy nhất!
 
         # Vẽ nền (sử dụng self.color đã được cập nhật) và viền
-        pygame.draw.rect(temp_surface, color, temp_surface.get_rect())
-        pygame.draw.rect(temp_surface, self.border_color, temp_surface.get_rect(), 2)
+        # Cả hai lệnh vẽ đều cần có border_radius để khớp với nhau
 
-        # Vẽ chữ nếu có
+        # 1. Vẽ nền với góc được bo tròn
+        pygame.draw.rect(temp_surface, color, temp_surface.get_rect(),
+                         border_radius=CORNER_RADIUS)  # <--- THÊM VÀO ĐÂY
+
+        # 2. Vẽ viền với góc được bo tròn
+        pygame.draw.rect(temp_surface, self.border_color, temp_surface.get_rect(), 2,
+                         border_radius=CORNER_RADIUS)  # <--- VÀ Ở ĐÂY
+
+        # Vẽ chữ nếu có (phần này không thay đổi)
         if self.letter:
             text_surface = LETTER_FONT.render(self.letter, True, self.text_color)
             text_rect = text_surface.get_rect(center=temp_surface.get_rect().center)
@@ -154,20 +159,14 @@ class Tile:
         drawable_surface = temp_surface
         drawable_rect = self.rect
 
-        # Nếu đang trong hiệu ứng lật
+        # Nếu đang trong hiệu ứng lật (phần này không thay đổi)
         if self.is_flipping:
-            # Tính toán tỷ lệ co giãn
             scale_y = abs(math.cos(math.radians(self.flip_angle)))
-
-            # Co giãn canvas phụ theo chiều dọc
-            # Lưu ý: kích thước width giữ nguyên, height thay đổi theo scale_y
-            new_height = max(1, int(self.rect.height * scale_y))  # Đảm bảo height ít nhất là 1
+            new_height = max(1, int(self.rect.height * scale_y))
             drawable_surface = pygame.transform.scale(temp_surface, (self.rect.width, new_height))
-
-            # Lấy rect mới và căn giữa nó với vị trí ban đầu
             drawable_rect = drawable_surface.get_rect(center=self.rect.center)
 
-        # Cuối cùng, "dán" kết quả (bản gốc hoặc bản đã co giãn) lên màn hình chính
+        # Cuối cùng, "dán" kết quả lên màn hình chính
         surface.blit(drawable_surface, drawable_rect)
 
 rowFip = 0
