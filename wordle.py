@@ -49,28 +49,38 @@ def get_random_word():
 
 def get_feedback(guess, secret_word):
     """
-    Tính toán phản hồi cho một lần đoán.
-    Trả về một danh sách các màu: GREEN, YELLOW, hoặc DARK_GRAY.
+    Tính toán phản hồi Wordle chuẩn.
     """
-    feedback = [None] * WORD_LENGTH
-    secret_word_list = list(secret_word)
-    guess_list = list(guess)
+    # Đảm bảo chữ thường
+    guess = guess.lower()
+    secret_word = secret_word.lower()
 
-    # Lượt 1: Tìm các chữ cái đúng vị trí (GREEN)
+    # Khởi tạo
+    feedback = [DARK_GRAY] * WORD_LENGTH
+
+    # Tạo bản sao có thể sửa đổi của từ bí mật
+    # Sử dụng dict để đếm tần suất chữ cái còn lại
+    secret_counts = {}
+    for char in secret_word:
+        secret_counts[char] = secret_counts.get(char, 0) + 1
+
+    # Lượt 1: Tìm GREEN
+    # Đồng thời loại trừ các ký tự GREEN khỏi việc đếm YELLOW
     for i in range(WORD_LENGTH):
-        if guess_list[i] == secret_word_list[i]:
+        if guess[i] == secret_word[i]:
             feedback[i] = GREEN
-            secret_word_list[i] = None  # Đánh dấu đã dùng
-            guess_list[i] = None  # Đánh dấu đã dùng
+            secret_counts[guess[i]] -= 1 # Giảm số lần xuất hiện của ký tự này
 
-    # Lượt 2: Tìm các chữ cái đúng nhưng sai vị trí (YELLOW)
+    # Lượt 2: Tìm YELLOW (và những chữ cái còn lại là DARK_GRAY)
     for i in range(WORD_LENGTH):
-        if guess_list[i] is not None:
-            if guess_list[i] in secret_word_list:
+        # Chỉ kiểm tra nếu chưa phải là GREEN
+        if feedback[i] != GREEN:
+            char = guess[i]
+            # Nếu ký tự có trong từ bí mật VÀ số lần xuất hiện còn lại > 0
+            if char in secret_counts and secret_counts[char] > 0:
                 feedback[i] = YELLOW
-                secret_word_list[secret_word_list.index(guess_list[i])] = None  # Đánh dấu đã dùng
-            else:
-                feedback[i] = DARK_GRAY
+                secret_counts[char] -= 1 # Giảm số lần xuất hiện này
+            # KHÔNG cần else vì đã khởi tạo là DARK_GRAY
 
     return feedback
 
@@ -93,6 +103,14 @@ class Tile:
         self.is_flipping = False
         self.flip_angle = 0  # Góc lật, từ 0 đến 180
         self.target_color = None
+    def get_letter(self):
+        return self.letter
+    def get_x(self):
+        return self.x
+    def get_y(self):
+        return self.y
+    def set_letter(self, letter):
+        self.letter = letter.upper()
     def start_flip(self, target_color):
         self.is_flipping = True
         self.target_color = target_color
@@ -112,43 +130,52 @@ class Tile:
                 self.flip_angle = 180
                 self.is_flipping = False
 
-    def draw(self, surface):
-        if not self.is_flipping:
-            pygame.draw.rect(surface, self.color, self.rect)
-            pygame.draw.rect(surface, self.border_color, self.rect, 2)
-            if self.letter:
-                text_surface = LETTER_FONT.render(self.letter, True, self.text_color)
-                text_rect = text_surface.get_rect(center=self.rect.center)
-                surface.blit(text_surface, text_rect)
-            return
-        temp_surface = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
-        temp_rect = temp_surface.get_rect()
+    def draw(self, surface, color):
+        # --- Bước 1: Chuẩn bị một "canvas phụ" cho ô vuông ---
+        # Luôn tạo một surface tạm để vẽ mọi thứ lên đó trước.
+        # SRCALPHA cho phép nó có nền trong suốt nếu cần.
+        temp_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
 
-        # Vẽ nền và viền lên canvas phụ
-        pygame.draw.rect(temp_surface, self.color, temp_rect)
-        pygame.draw.rect(temp_surface, self.border_color, temp_rect, 2)
+        # --- Bước 2: Vẽ tất cả các thành phần lên canvas phụ đó ---
+        # Code vẽ nền, viền và chữ bây giờ chỉ còn ở một nơi duy nhất!
 
-        # Vẽ chữ lên canvas phụ
+        # Vẽ nền (sử dụng self.color đã được cập nhật) và viền
+        pygame.draw.rect(temp_surface, color, temp_surface.get_rect())
+        pygame.draw.rect(temp_surface, self.border_color, temp_surface.get_rect(), 2)
+
+        # Vẽ chữ nếu có
         if self.letter:
             text_surface = LETTER_FONT.render(self.letter, True, self.text_color)
-            text_rect = text_surface.get_rect(center=temp_rect.center)
+            text_rect = text_surface.get_rect(center=temp_surface.get_rect().center)
             temp_surface.blit(text_surface, text_rect)
 
-        # 2. BIẾN ĐỔI CANVAS PHỤ ĐÓ
-        # Tính toán tỷ lệ co giãn chiều cao dựa trên góc lật
-        # math.cos tạo ra một đường cong mượt mà từ 1 -> 0 -> -1 -> 0 -> 1
-        # abs() để đảm bảo tỷ lệ luôn dương
-        scale_y = abs(math.cos(math.radians(self.flip_angle)))
+        # --- Bước 3: Quyết định cách "dán" canvas phụ lên màn hình chính ---
+        drawable_surface = temp_surface
+        drawable_rect = self.rect
 
-        # Co giãn canvas phụ theo chiều dọc
-        scaled_surface = pygame.transform.scale(temp_surface, (SQUARE_SIZE, int(SQUARE_SIZE * scale_y)))
-        scaled_rect = scaled_surface.get_rect(center=self.rect.center)
+        # Nếu đang trong hiệu ứng lật
+        if self.is_flipping:
+            # Tính toán tỷ lệ co giãn
+            scale_y = abs(math.cos(math.radians(self.flip_angle)))
 
-        # 3. "DÁN" KẾT QUẢ LÊN MÀN HÌNH CHÍNH
-        surface.blit(scaled_surface, scaled_rect)
+            # Co giãn canvas phụ theo chiều dọc
+            # Lưu ý: kích thước width giữ nguyên, height thay đổi theo scale_y
+            new_height = max(1, int(self.rect.height * scale_y))  # Đảm bảo height ít nhất là 1
+            drawable_surface = pygame.transform.scale(temp_surface, (self.rect.width, new_height))
 
-def draw_grid(guesses, feedbacks, current_guess, current_row):
+            # Lấy rect mới và căn giữa nó với vị trí ban đầu
+            drawable_rect = drawable_surface.get_rect(center=self.rect.center)
 
+        # Cuối cùng, "dán" kết quả (bản gốc hoặc bản đã co giãn) lên màn hình chính
+        surface.blit(drawable_surface, drawable_rect)
+
+def draw_grid(feedbacks, current_guess, current_row, matrix):
+    for i in range(MAX_GUESSES):
+        for j in range(WORD_LENGTH):
+            color = LIGHT_GRAY
+            if(feedbacks[i][j]):
+                color = feedbacks[i][j]
+            matrix[i][j].draw(screen, color);
 
 def draw_message(message):
     """Hiển thị thông báo ở cuối màn hình."""
@@ -163,17 +190,18 @@ def main():
     feedbacks = [[None] * WORD_LENGTH for _ in range(MAX_GUESSES)]
     current_guess = []
     current_row = 0
+    current_column = 0
     game_over = False
     message = ""
 
-    grid = []
+    matrix = []
     for row in range(MAX_GUESSES):
         row_tiles = []
         for col in range(WORD_LENGTH):
             x = GRID_LEFT_MARGIN + col * (SQUARE_SIZE + SQUARE_MARGIN)
             y = GRID_TOP_MARGIN + row * (SQUARE_SIZE + SQUARE_MARGIN)
             row_tiles.append(Tile("", x, y))
-        grid.append(row_tiles)
+        matrix.append(row_tiles)
 
     running = True
     while running:
@@ -186,9 +214,11 @@ def main():
 
             if not game_over and event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:  # Phím Enter
-                    if len(current_guess) == WORD_LENGTH:
-                        guess_str = "".join(current_guess)
-                        guesses[current_row] = guess_str
+                    if current_column == WORD_LENGTH:
+                        guess_str = ""
+                        for i in range(WORD_LENGTH):
+                            guess_str += matrix[current_row][i].get_letter().lower()
+                        print(guess_str, secret_word)
                         feedbacks[current_row] = get_feedback(guess_str, secret_word)
 
                         if guess_str == secret_word:
@@ -196,17 +226,18 @@ def main():
                             game_over = True
                         else:
                             current_row += 1
-                            current_guess = []
+                            current_column = 0
                             if current_row == MAX_GUESSES:
                                 message = f"Bạn đã thua! Từ đó là: {secret_word.upper()}"
                                 game_over = True
 
                 elif event.key == pygame.K_BACKSPACE:  # Phím xóa
-                    if len(current_guess) > 0:
-                        current_guess.pop()
-
-                elif len(current_guess) < WORD_LENGTH and event.unicode.isalpha():
-                    current_guess.append(event.unicode.lower())
+                    if current_column > 0:
+                        matrix[current_row][current_column].set_letter("")
+                        current_column -= 1
+                elif current_column < WORD_LENGTH and event.unicode.isalpha():
+                    matrix[current_row][current_column].set_letter(event.unicode);
+                    current_column += 1
 
         # --- Vẽ màn hình ---
         screen.fill(WHITE)
@@ -217,7 +248,7 @@ def main():
         screen.blit(title_surface, title_rect)
 
         # Vẽ lưới
-        draw_grid(guesses, feedbacks, current_guess, current_row)
+        draw_grid(feedbacks, current_guess, current_row, matrix)
 
         # Vẽ thông báo kết thúc trò chơi
         if game_over:
