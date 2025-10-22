@@ -1,10 +1,7 @@
-import time
-from operator import truediv
 import asyncio #web version
 import pygame
+import math
 import random
-import sys
-import os
 import json
 # --- Khởi tạo Pygame ---
 pygame.init()
@@ -37,8 +34,6 @@ CORNER_RADIUS = 8
 SQUARE_MARGIN = 10
 GRID_TOP_MARGIN = 100
 GRID_LEFT_MARGIN = (SCREEN_WIDTH - (WORD_LENGTH * SQUARE_SIZE + (WORD_LENGTH - 1) * SQUARE_MARGIN)) // 2
-
-# Danh sách từ (bạn có thể mở rộng danh sách này hoặc tải từ một tệp)
 WORD_LIST = json.loads(open("wordle.json").read())
 
 # --- Thiết lập màn hình ---
@@ -50,30 +45,16 @@ def get_random_word():
     return random.choice(WORD_LIST)
 
 def get_feedback(guess, secret_word):
-    """
-    Tính toán phản hồi Wordle chuẩn.
-    """
-    # Đảm bảo chữ thường
     guess = guess.lower()
     secret_word = secret_word.lower()
-
-    # Khởi tạo
     feedback = [DARK_GRAY] * WORD_LENGTH
-
-    # Tạo bản sao có thể sửa đổi của từ bí mật
-    # Sử dụng dict để đếm tần suất chữ cái còn lại
     secret_counts = {}
     for char in secret_word:
         secret_counts[char] = secret_counts.get(char, 0) + 1
-
-    # Lượt 1: Tìm GREEN
-    # Đồng thời loại trừ các ký tự GREEN khỏi việc đếm YELLOW
     for i in range(WORD_LENGTH):
         if guess[i] == secret_word[i]:
             feedback[i] = GREEN
             secret_counts[guess[i]] -= 1 # Giảm số lần xuất hiện của ký tự này
-
-    # Lượt 2: Tìm YELLOW (và những chữ cái còn lại là DARK_GRAY)
     for i in range(WORD_LENGTH):
         # Chỉ kiểm tra nếu chưa phải là GREEN
         if feedback[i] != GREEN:
@@ -82,14 +63,7 @@ def get_feedback(guess, secret_word):
             if char in secret_counts and secret_counts[char] > 0:
                 feedback[i] = YELLOW
                 secret_counts[char] -= 1 # Giảm số lần xuất hiện này
-            # KHÔNG cần else vì đã khởi tạo là DARK_GRAY
-
     return feedback
-
-
-import pygame
-import math
-
 
 class Tile:
     def __init__(self, letter, x, y):
@@ -105,6 +79,15 @@ class Tile:
         self.is_flipping = False
         self.flip_angle = 0  # Góc lật, từ 0 đến 180
         self.target_color = None
+        self.flip_speed = 0.5  # Tốc độ lật
+        self.flip_delay = 0  # Thời gian chờ trước khi bắt đầu lật
+        # --- THÊM THUỘC TÍNH MỚI CHO HIỆU ỨNG POP ---
+        self.is_popping = False
+        self.pop_scale = 1.0  # Tỷ lệ phóng to ban đầu
+        self.pop_speed = 0.005  # Tốc độ phóng to/thu nhỏ
+        self.pop_direction = 1  # 1: Đang phóng to, -1: Đang thu nhỏ
+        self.pop_max = 1.3
+
     def get_letter(self):
         return self.letter
     def get_x(self):
@@ -113,87 +96,89 @@ class Tile:
         return self.y
     def set_letter(self, letter):
         self.letter = letter.upper()
-    def start_flip(self, target_color):
+    def start_flip(self, target_color, delay):
         self.is_flipping = True
         self.target_color = target_color
-    def update(self):
+        self.flip_delay = delay # Set thời gian chờ
+    def start_popping(self):
+        self.is_popping = True
+        self.pop_scale = 1.0  # Tỷ lệ phóng to ban đầu
+        self.pop_speed = 0.005  # Tốc độ phóng to/thu nhỏ
+        self.pop_direction = 1  # 1: Đang phóng to, -1: Đang thu nhỏ
+        self.pop_max = 1.3
+    def upPop(self):
+        if self.is_popping:
+            self.pop_scale += self.pop_speed * self.pop_direction
+            if self.pop_scale >= self.pop_max:
+                self.pop_scale = self.pop_max
+                self.pop_direction = -1  # Bắt đầu thu nhỏ
+
+            # Kết thúc hiệu ứng khi đã thu về kích thước ban đầu
+            if self.pop_scale <= 1.0 and self.pop_direction == -1:
+                self.is_popping = False
+    def upFlip(self):
         if self.is_flipping:
-            # Tăng góc lật, tốc độ có thể điều chỉnh
-            self.flip_angle += 1.5
+            # Nếu còn thời gian chờ, giảm nó đi và không làm gì cả
+            if self.flip_delay > 0:
+                self.flip_delay -= 1
+                return
+            self.flip_angle += self.flip_speed
             # Giai đoạn 1 kết thúc (lật được nửa đường)
             if self.flip_angle >= 90 and self.color != self.target_color:
                 self.color = self.target_color
                 # Nếu màu nền là màu đậm, đổi chữ thành màu trắng
                 if self.color in [GREEN, YELLOW, DARK_GRAY]:
                     self.text_color = WHITE
-
-            # Hoàn thành lật
             if self.flip_angle >= 180:
                 self.flip_angle = 180
                 self.is_flipping = False
+    def update(self):
+        self.upPop()
+        self.upFlip()
 
     def draw(self, surface, color):
-        # --- Bước 1: Chuẩn bị một "canvas phụ" cho ô vuông ---
-        temp_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-
-        # --- Bước 2: Vẽ tất cả các thành phần lên canvas phụ đó ---
-
-        # Vẽ nền (sử dụng self.color đã được cập nhật) và viền
-        # Cả hai lệnh vẽ đều cần có border_radius để khớp với nhau
-
-        # 1. Vẽ nền với góc được bo tròn
-        pygame.draw.rect(temp_surface, color, temp_surface.get_rect(),
-                         border_radius=CORNER_RADIUS)  # <--- THÊM VÀO ĐÂY
-
-        # 2. Vẽ viền với góc được bo tròn
-        pygame.draw.rect(temp_surface, self.border_color, temp_surface.get_rect(), 2,
-                         border_radius=CORNER_RADIUS)  # <--- VÀ Ở ĐÂY
-
-        # Vẽ chữ nếu có (phần này không thay đổi)
+        base_surface = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
+        base_rect = base_surface.get_rect()
+        pygame.draw.rect(base_surface, self.color, base_rect, border_radius=CORNER_RADIUS)
+        pygame.draw.rect(base_surface, self.border_color, base_rect, 2, border_radius=CORNER_RADIUS)
         if self.letter:
             text_surface = LETTER_FONT.render(self.letter, True, self.text_color)
-            text_rect = text_surface.get_rect(center=temp_surface.get_rect().center)
-            temp_surface.blit(text_surface, text_rect)
+            text_rect = text_surface.get_rect(center=base_rect.center)
+            base_surface.blit(text_surface, text_rect)
+        # ====================================================================
+        # BƯỚC 2: ÁP DỤNG CÁC HIỆU ỨNG BIẾN ĐỔI LÊN CANVAS ĐÓ
+        # ====================================================================
 
-        # --- Bước 3: Quyết định cách "dán" canvas phụ lên màn hình chính ---
-        drawable_surface = temp_surface
-        drawable_rect = self.rect
+        # Bắt đầu với canvas gốc và vị trí gốc
+        drawable_surface = base_surface
+        drawable_rect = self.rect.copy()  # Dùng copy để không thay đổi rect gốc
 
-        # Nếu đang trong hiệu ứng lật (phần này không thay đổi)
-        if self.is_flipping:
-            scale_y = abs(math.cos(math.radians(self.flip_angle)))
-            new_height = max(1, int(self.rect.height * scale_y))
-            drawable_surface = pygame.transform.scale(temp_surface, (self.rect.width, new_height))
+        # --- Áp dụng hiệu ứng Pop (Phóng to/Thu nhỏ) ---
+        if self.is_popping:
+            scaled_width = int(SQUARE_SIZE * self.pop_scale)
+            scaled_height = int(SQUARE_SIZE * self.pop_scale)
+            # Biến đổi surface hiện tại (có thể đã được lật hoặc chưa)
+            drawable_surface = pygame.transform.scale(drawable_surface, (scaled_width, scaled_height))
+            # Căn giữa lại sau khi phóng to
             drawable_rect = drawable_surface.get_rect(center=self.rect.center)
 
-        # Cuối cùng, "dán" kết quả lên màn hình chính
+        # --- Áp dụng hiệu ứng Flip (Lật) ---
+        if self.is_flipping:
+            scale_y = abs(math.cos(math.radians(self.flip_angle)))
+            new_height = max(1, int(drawable_rect.height * scale_y))  # Dùng chiều cao hiện tại
+
+            # Biến đổi surface hiện tại (có thể đã được pop hoặc chưa)
+            drawable_surface = pygame.transform.scale(drawable_surface, (drawable_rect.width, new_height))
+
+            # Căn giữa lại sau khi lật
+            drawable_rect = drawable_surface.get_rect(center=self.rect.center)
+
+        # ====================================================================
+        # BƯỚC 3: "DÁN" KẾT QUẢ CUỐI CÙNG LÊN MÀN HÌNH CHÍNH
+        # ====================================================================
         surface.blit(drawable_surface, drawable_rect)
 
-rowFip = 0
-colFlip = 10
-FlipAnimation = False
-def flip(feedbacks, current_guess, current_row, matrix):
-    global rowFip
-    global colFlip
-    global FlipAnimation
-    matrix[rowFip][colFlip].update()
-    if not matrix[rowFip][colFlip].is_flipping:
-        colFlip += 1
-        if colFlip != WORD_LENGTH:
-            matrix[rowFip][colFlip].start_flip(feedbacks[rowFip][colFlip])
-
-def draw_grid(feedbacks, current_guess, current_row, matrix):
-    global FlipAnimation
-    if colFlip == WORD_LENGTH:
-        FlipAnimation = False
-    for i in range(MAX_GUESSES):
-        for j in range(WORD_LENGTH):
-            if i == rowFip and j == colFlip:
-                flip(feedbacks, current_guess, i, matrix)
-            color = LIGHT_GRAY
-            if feedbacks[i][j]:
-                color = feedbacks[i][j]
-            matrix[i][j].draw(screen, color)
+is_flipping_row = False
 
 def draw_message(message):
     """Hiển thị thông báo ở cuối màn hình."""
@@ -202,18 +187,12 @@ def draw_message(message):
     screen.blit(text_surface, text_rect)
 
 async def main():
-    """Vòng lặp chính của trò chơi."""
     secret_word = get_random_word()
-    guesses = [""] * MAX_GUESSES
     feedbacks = [[None] * WORD_LENGTH for _ in range(MAX_GUESSES)]
-    current_guess = []
     current_row = 0
     current_column = 0
-    global rowFip
-    global colFlip
-    global FlipAnimation
+    global is_flipping_row
     game_over = False
-    message = ""
 
     matrix = []
     for row in range(MAX_GUESSES):
@@ -231,37 +210,52 @@ async def main():
             if event.type == pygame.QUIT:
                 running = False
                 pygame.quit()
-                sys.exit()
-            if not game_over and event.type == pygame.KEYDOWN and not FlipAnimation:
-                if event.key == pygame.K_RETURN:  # Phím Enter
-                    FlipAnimation = True
-                    rowFip = current_row
-                    colFlip = 0
+            if not game_over and event.type == pygame.KEYDOWN and not is_flipping_row:
+                if event.key == pygame.K_RETURN:
                     if current_column == WORD_LENGTH:
-                        guess_str = ""
-                        for i in range(WORD_LENGTH):
-                            guess_str += matrix[current_row][i].get_letter().lower()
-                        print(guess_str, secret_word)
+                        guess_str = "".join([matrix[current_row][i].get_letter() for i in range(WORD_LENGTH)]).lower()
                         feedbacks[current_row] = get_feedback(guess_str, secret_word)
-                        matrix[rowFip][colFlip].start_flip(feedbacks[rowFip][colFlip])
-
-                        if guess_str == secret_word:
-                            message = f"Chính xác! Từ đó là: {secret_word.upper()}"
-                            game_over = True
-                        else:
-                            current_row += 1
-                            current_column = 0
-                            if current_row == MAX_GUESSES:
-                                message = f"Bạn đã thua! Từ đó là: {secret_word.upper()}"
-                                game_over = True
+                        print(guess_str, secret_word)
+                        delay_increment = 60
+                        for col in range(WORD_LENGTH):
+                            tile = matrix[current_row][col]
+                            target_color = feedbacks[current_row][col]
+                            # Gọi start_flip với độ trễ tăng dần cho mỗi ô
+                            tile.start_flip(target_color, col * delay_increment)
+                        is_flipping_row = True  # Bật cờ báo hiệu animation đang chạy
 
                 elif event.key == pygame.K_BACKSPACE:  # Phím xóa
                     if current_column > 0:
                         matrix[current_row][current_column - 1].set_letter("")
                         current_column -= 1
                 elif current_column < WORD_LENGTH and event.unicode.isalpha():
-                    matrix[current_row][current_column].set_letter(event.unicode);
+                    matrix[current_row][current_column].set_letter(event.unicode)
+                    matrix[current_row][current_column].start_popping()
                     current_column += 1
+        if is_flipping_row:
+            # Kiểm tra xem tất cả các ô trong hàng đã lật xong chưa
+            all_flipped = True
+            for tile in matrix[current_row]:
+                tile.update()  # Mỗi ô tự cập nhật trạng thái lật của nó
+                if tile.is_flipping:
+                    all_flipped = False  # Nếu còn 1 ô đang lật thì chưa xong
+
+            if all_flipped:
+                is_flipping_row = False  # Tắt cờ animation
+                guess_str = "".join([matrix[current_row][i].get_letter() for i in range(WORD_LENGTH)]).lower()
+                if guess_str == secret_word:
+                    message = f"Chính xác! Từ đó là: {secret_word.upper()}"
+                    game_over = True
+                else:
+                    current_row += 1
+                    current_column = 0
+                    if current_row == MAX_GUESSES:
+                        message = f"Bạn đã thua! Từ đó là: {secret_word.upper()}"
+                        game_over = True
+
+        for row in matrix:
+            for tile in row:
+                tile.update()
 
         # --- Vẽ màn hình ---
         screen.fill(WHITE)
@@ -271,14 +265,13 @@ async def main():
         title_rect = title_surface.get_rect(center=(SCREEN_WIDTH / 2, 50))
         screen.blit(title_surface, title_rect)
 
-        # Vẽ lưới
-        draw_grid(feedbacks, current_guess, current_row, matrix)
-
+        # Vẽ lưới (HÀM MỚI, ĐƠN GIẢN HƠN)
+        for row in range(MAX_GUESSES):
+            for col in range(WORD_LENGTH):
+                matrix[row][col].draw(screen, matrix[row][col].color)
         # Vẽ thông báo kết thúc trò chơi
         if game_over:
-            draw_message(message)
-
-        # Cập nhật màn hình
+            draw_message(";")
         pygame.display.flip()
         await asyncio.sleep(0)
 
