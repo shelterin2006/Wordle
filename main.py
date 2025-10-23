@@ -4,6 +4,8 @@ import math
 import random
 import json
 
+
+
 pygame.init()
 pygame.font.init()
 SCREEN_WIDTH = 620
