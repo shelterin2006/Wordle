@@ -15,10 +15,10 @@ YELLOW = (201, 180, 88)
 LIGHT_GRAY = (211, 211, 211)
 DARK_GRAY = (120, 124, 126)
 MID_GRAY = (119, 119, 119)
-LETTER_FONT = pygame.font.Font("Poppins-Regular.ttf", 60)
-NOTIFICATION_FONT = pygame.font.SysFont("helvetica", 27)
-MESSAGE_FONT = pygame.font.Font("Poppins-Regular.ttf", 40)
-SMALL_MESSAGE_FONT = pygame.font.SysFont("helvetica", 20)
+LETTER_FONT = pygame.font.Font("font/Poppins-Regular.ttf", size=60)
+NOTIFICATION_FONT = pygame.font.Font("font/Helvetica.ttf", size=27)
+MESSAGE_FONT = pygame.font.Font("font/Helvetica.ttf", size=40)
+SMALL_MESSAGE_FONT = pygame.font.Font("font/Helvetica.ttf", size=20)
 is_flipping_row = False
 WORD_LENGTH = 5
 MAX_GUESSES = 6
