@@ -1,10 +1,8 @@
-import asyncio #web version
+import asyncio
 import pygame
 import math
 import random
 import json
-
-
 
 pygame.init()
 pygame.font.init()
@@ -14,8 +12,8 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (106, 170, 100)
 YELLOW = (201, 180, 88)
-LIGHT_GRAY = (211, 211, 211)  # Màu viền ô
-DARK_GRAY = (120, 124, 126)  # Màu chữ cái đã đoán sai
+LIGHT_GRAY = (211, 211, 211)
+DARK_GRAY = (120, 124, 126)
 MID_GRAY = (119, 119, 119)
 LETTER_FONT = pygame.font.Font("Poppins-Regular.ttf", 60)
 NOTIFICATION_FONT = pygame.font.SysFont("helvetica", 27)
@@ -33,9 +31,11 @@ WORD_LIST = json.loads(open("wordle.json").read())
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Wordle with Pygame")
 
+# Get a random word from the word list
 def get_random_word():
     return random.choice(WORD_LIST)
 
+# Calculate feedback colors for each letter in the guess
 def get_feedback(guess, secret_word):
     guess = guess.lower()
     secret_word = secret_word.lower()
@@ -52,10 +52,12 @@ def get_feedback(guess, secret_word):
             char = guess[i]
             if char in secret_counts and secret_counts[char] > 0:
                 feedback[i] = YELLOW
-                secret_counts[char] -= 1 # Giảm số lần xuất hiện này
+                secret_counts[char] -= 1
     return feedback
 
+# Tile class representing each letter square in the game
 class Tile:
+    # Initialize a tile with letter, position and default properties
     def __init__(self, letter, x, y):
         self.shake = None
         self.pop = None
@@ -65,12 +67,13 @@ class Tile:
         self.x = x
         self.y = y
         self.rect = pygame.Rect(self.x, self.y, SQUARE_SIZE, SQUARE_SIZE)
-        # Gọi reset để khởi tạo tất cả các giá trị một cách nhất quán
         self.reset()
 
+    # Get the current letter in the tile
     def get_letter(self):
         return self.letter
 
+    # Set the letter and update border color
     def set_letter(self, letter):
         self.letter = letter.upper()
         if self.letter == "":
@@ -78,6 +81,7 @@ class Tile:
         else:
             self.colors["border"] = MID_GRAY
 
+    # Reset tile to initial state
     def reset(self):
         self.letter = ""
         self.colors = {
@@ -88,7 +92,7 @@ class Tile:
         self.flip = {
             "is_active": False,
             "angle": 0,
-            "speed": 700,  # <-- TỐC ĐỘ LẬT RIÊNG
+            "speed": 700,
             "delay": 0,
             "target_color": None
         }
@@ -107,16 +111,19 @@ class Tile:
             "speed": 50
         }
 
+    # Start shake animation for invalid input
     def start_shake(self):
         if not self.flip["is_active"]:
             self.shake["is_active"] = True
             self.shake["timer"] = 0.4
 
+    # Start flip animation with target color and delay
     def start_flip(self, target_color, delay):
         self.flip["is_active"] = True
         self.flip["target_color"] = target_color
         self.flip["delay"] = delay
 
+    # Start pop animation when letter is entered
     def start_popping(self):
         if not self.pop["is_active"]:
             self.pop["is_active"] = True
@@ -128,6 +135,7 @@ class Tile:
         self.upPop(dt)
         self.upFlip(dt)
 
+    # Update shake animation
     def upShake(self, dt):
         if self.shake["is_active"]:
             self.shake["timer"] -= dt
@@ -137,6 +145,7 @@ class Tile:
             else:
                 self.shake["offset"] = self.shake["magnitude"] * math.sin(self.shake["timer"] * self.shake["speed"])
 
+    # Update pop animation
     def upPop(self, dt):
         if self.pop["is_active"]:
             self.pop["scale"] += self.pop["speed"] * self.pop["direction"] * (dt * 60)
@@ -147,6 +156,7 @@ class Tile:
                 self.pop["scale"] = 1.0
                 self.pop["is_active"] = False
 
+    # Update flip animation
     def upFlip(self, dt):
         if self.flip["is_active"]:
             if self.flip["delay"] > 0:
@@ -164,8 +174,8 @@ class Tile:
                 self.flip["angle"] = 180
                 self.flip["is_active"] = False
 
+    # Draw the tile with all animations applied
     def draw(self, surface):
-        # ... (Hàm draw không cần thay đổi)
         base_surface = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
         base_rect = base_surface.get_rect()
         pygame.draw.rect(base_surface, self.colors["bg"], base_rect, border_radius=CORNER_RADIUS)
@@ -195,28 +205,27 @@ class Tile:
         surface.blit(drawable_surface, drawable_rect)
 
 
+# Draw game over message and replay instruction
 def draw_message(message):
     text_surface_main = MESSAGE_FONT.render(message, True, BLACK)
-    text_rect_main = text_surface_main.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 80)) # Nâng lên một chút
+    text_rect_main = text_surface_main.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 80))
     screen.blit(text_surface_main, text_rect_main)
     replay_surface = SMALL_MESSAGE_FONT.render("Press any key to play again", True, DARK_GRAY)
     replay_rect = replay_surface.get_rect(center=(text_rect_main.centerx, text_rect_main.bottom + 20))
     screen.blit(replay_surface, replay_rect)
 
 
+# Draw notification message in center of screen
 def draw_notification(message):
     if not message:
         return
-    # Tạo surface cho văn bản
     text_surface = NOTIFICATION_FONT.render(message, True, WHITE)
-    # Tạo một hình chữ nhật nền màu đen, hơi trong suốt và lớn hơn text một chút
     bg_rect = text_surface.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
-    bg_rect.inflate_ip(20, 10)  # Làm cho nền to hơn text
-    # Vẽ nền
+    bg_rect.inflate_ip(20, 10)
     pygame.draw.rect(screen, DARK_GRAY, bg_rect, border_radius=5)
-    # Vẽ text lên trên nền
     screen.blit(text_surface, text_surface.get_rect(center=bg_rect.center))
 
+# Main game loop and logic
 async def main():
     secret_word = get_random_word()
     feedbacks = [[WHITE] * WORD_LENGTH for _ in range(MAX_GUESSES)]
@@ -240,13 +249,11 @@ async def main():
     notification_timer = 0.0
     while running:
         dt = clock.tick(60) / 1000.0
-        # Nếu dt quá lớn (ví dụ khi kéo cửa sổ), giới hạn nó lại để tránh lỗi vật lý
         dt = min(dt, 0.1)
         if notification_timer > 0:
             notification_timer -= dt
             if notification_timer <= 0:
-                notification = ""  # Xóa thông báo khi hết giờ
-        # --- Xử lý sự kiện ---
+                notification = ""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -270,16 +277,16 @@ async def main():
                             for tile in matrix[current_row]:
                                 tile.start_shake()
                             notification = "Not in word list"
-                            notification_timer = 1.0  # Hiển thị trong 2 giây
+                            notification_timer = 1.0
                         else:
-                            delay_increment = 0.2  # Delay 0.2 giây giữa mỗi ô
+                            delay_increment = 0.2
                             for col in range(WORD_LENGTH):
                                 tile = matrix[current_row][col]
                                 target_color = feedbacks[current_row][col]
                                 tile.start_flip(target_color, col * delay_increment)
                             is_flipping_row = True
 
-                elif event.key == pygame.K_BACKSPACE:  # Phím xóa
+                elif event.key == pygame.K_BACKSPACE:
                     if current_column > 0:
                         matrix[current_row][current_column - 1].set_letter("")
                         current_column -= 1
@@ -294,7 +301,6 @@ async def main():
                 if row_idx == current_row and is_flipping_row and tile.flip["is_active"]:
                     all_flipped_in_row = False
 
-        # --- Xử lý Logic Game sau khi Update ---
         if is_flipping_row and all_flipped_in_row:
             is_flipping_row = False
             guess_str = "".join([matrix[current_row][i].get_letter() for i in range(WORD_LENGTH)]).lower()
@@ -302,16 +308,14 @@ async def main():
             if guess_str == secret_word:
                 message = f"You got it! The word was {secret_word.upper()}"
                 game_over = True
-            elif current_row == MAX_GUESSES - 1:  # Kiểm tra thua cuộc trước khi tăng current_row
+            elif current_row == MAX_GUESSES - 1:
                 message = f"So close! The word was: {secret_word.upper()}"
                 game_over = True
-            else:  # Nếu chưa thắng và chưa hết lượt thì mới chuyển hàng
+            else:
                 current_row += 1
                 current_column = 0
 
-        # --- Vẽ màn hình (Draw) ---
         screen.fill(WHITE)
-        # Vẽ tiêu đề
         title_surface = MESSAGE_FONT.render("Wordle Game", True, BLACK)
         title_rect = title_surface.get_rect(center=(SCREEN_WIDTH / 2, 50))
         screen.blit(title_surface, title_rect)
@@ -321,7 +325,7 @@ async def main():
 
         draw_notification(notification)
         if game_over:
-            draw_message(message)  # Truyền message vào đây
+            draw_message(message)
 
         pygame.display.flip()
         await asyncio.sleep(0)
