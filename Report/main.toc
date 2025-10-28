@@ -1,0 +1,32 @@
+\contentsline {chapter}{Lời cam đoan}{i}{Doc-Start}%
+\contentsline {chapter}{Lời cảm ơn}{ii}{chapter*.1}%
+\contentsline {chapter}{Mục lục}{iii}{chapter*.2}%
+\contentsline {chapter}{Đánh giá thành viên}{iii}{chapter*.3}%
+\contentsline {chapter}{Đánh giá mức độ hoàn thành từng yêu cầu}{v}{chapter*.4}%
+\contentsline {chapter}{\numberline {1}Ngôn ngữ}{1}{chapter.1}%
+\contentsline {chapter}{\numberline {2}Nội dung chính của báo cáo}{2}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Giới thiệu bài toán}{2}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Giải thích phần xử lý dữ liệu, giới thiệu mô hình, giải thích mô hình}{3}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Xây dựng tập dữ liệu}{3}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Giới thiệu Mô hình}{4}{subsection.2.2.2}%
+\contentsline {subsubsection}{CNN là gì?}{4}{subsection.2.2.2}%
+\contentsline {subsubsection}{Lớp tích chập - Convolution Layer}{6}{figure.2.4}%
+\contentsline {subsubsection}{Hàm phi tuyến - ReLU}{7}{figure.2.4}%
+\contentsline {subsubsection}{Lớp gộp - Pooling Layer}{8}{figure.2.4}%
+\contentsline {subsubsection}{Dropout:}{8}{figure.2.4}%
+\contentsline {subsection}{\numberline {2.2.3}Giải thích Mô hình}{10}{subsection.2.2.3}%
+\contentsline {subsubsection}{Khởi tạo mô hình}{10}{subsection.2.2.3}%
+\contentsline {subsubsection}{Quá trình huấn luyện}{10}{lstnumber.-1.2}%
+\contentsline {subsubsection}{Lớp Fully Connected:}{12}{lstnumber.-3.5}%
+\contentsline {subsubsection}{Hàm forward:}{13}{lstnumber.-6.3}%
+\contentsline {subsection}{\numberline {2.2.4}Cách thức hoạt động:}{14}{subsection.2.2.4}%
+\contentsline {section}{\numberline {2.3}Experiment}{17}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1} Giới thiệu dataset, mô tả dataset( gồm bao nhiêu mẫu, có những gì trong dataset)}{17}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Cấu hình chạy thí nghiệm}{19}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Kết quả chạy thí nghiệm}{20}{subsection.2.3.3}%
+\contentsline {section}{\numberline {2.4}Kết luận}{20}{section.2.4}%
+\contentsline {chapter}{\numberline {3}Báo cáo làm việc hàng tuần}{22}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Họp lần 1}{22}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Họp lần 2}{23}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Họp lần 3}{24}{section.3.3}%
+\contentsline {chapter}{Tài liệu tham khảo}{26}{Item.19}%
