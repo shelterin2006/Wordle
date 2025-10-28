@@ -20,8 +20,8 @@ A Python implementation of the popular Wordle game using Pygame. This game featu
 
 1. **Clone or download the project files**
    ```bash
-   git clone <repository-url>
-   cd wordle-game
+   git clone https://github.com/shelterin2006/Wordle
+   cd Wordle
    ```
 
 2. **Install Python dependencies**
@@ -55,7 +55,7 @@ wordle-game/
 
 1. **Navigate to the project directory**
    ```bash
-   cd wordle-game
+   cd Wordle
    ```
 
 2. **Run the game**
