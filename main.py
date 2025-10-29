@@ -1,4 +1,3 @@
-import asyncio
 import pygame
 import math
 import random
@@ -35,7 +34,7 @@ GACHA_GRID_LEFT_MARGIN = SCREEN_WIDTH / 2 + (SCREEN_WIDTH / 2 - GRID_WIDTH) // 2
 
 WORD_LIST = json.loads(open("wordle.json").read())
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Wordle: Gacha Edition")
+pygame.display.set_caption("Wordle")
 
 
 def get_random_word():
@@ -108,7 +107,6 @@ class Tile:
                 self.shake["is_active"] = False; self.shake["offset"] = 0
             else:
                 self.shake["offset"] = self.shake["magnitude"] * math.sin(self.shake["timer"] * self.shake["speed"])
-
     def upPop(self, dt):
         if self.pop["is_active"]:
             self.pop["scale"] += self.pop["speed"] * self.pop["direction"] * (dt * 60)
@@ -176,7 +174,7 @@ def draw_ui(guesses_left, spins_left):
     gacha_title_rect = gacha_title.get_rect(center=(GACHA_GRID_LEFT_MARGIN + GRID_WIDTH / 2, GRID_TOP_MARGIN - 40))
     screen.blit(gacha_title, gacha_title_rect)
 
-async def main():
+def main():
     secret_word = get_random_word()
     guesses_remaining = MAX_GUESSES
     gacha_spins_remaining = MAX_GACHA_SPINS
@@ -208,6 +206,13 @@ async def main():
     clock = pygame.time.Clock()
     notification = ""
     notification_timer = 0.0
+    original_icon = pygame.image.load('logo.png').convert_alpha()
+    w, h = original_icon.get_size()
+    icon_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+    border_radius = int(min(w, h) * 0.225)  # ví dụ dùng 22.5% như macOS
+    pygame.draw.rect(icon_surf, (255, 255, 255, 255), (0, 0, w, h), border_radius=border_radius)
+    icon_surf.blit(original_icon, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+    pygame.display.set_icon(icon_surf)
     while running:
         dt = clock.tick(60) / 1000.0
         dt = min(dt, 0.1)
@@ -217,7 +222,7 @@ async def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False; pygame.quit(); return
             if game_over:
-                if event.type == pygame.KEYDOWN: await main()
+                if event.type == pygame.KEYDOWN: main()
                 continue
             if not is_flipping_row:
                 if event.type == pygame.KEYDOWN:
@@ -297,8 +302,6 @@ async def main():
         draw_notification(notification)
         if game_over: draw_message(message)
         pygame.display.flip()
-        await asyncio.sleep(0)
-
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
